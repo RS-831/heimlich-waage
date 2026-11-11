@@ -1,0 +1,19 @@
+services:
+  heimlich-waage:
+    build:
+      context: .
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    image: heimlich-waage:latest
+    container_name: heimlich-waage
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      DATA_DIR: /data
+      DB_FILE: ${DB_FILE:-gewicht.db}
+      AUTH_MODE: ${AUTH_MODE:-none}
+    volumes:
+      # Datenordner auf dem Host -> /data im Container
+      - ${DATA_PATH:-~/gewicht-daten}:/data

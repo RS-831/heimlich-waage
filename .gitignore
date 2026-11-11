@@ -1,0 +1,15 @@
+# Daten nie einchecken (Gesundheitsdaten)
+*.db
+*.db-*
+*.sqlite
+*.csv
+data/
+
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Private Notizen (nur lokal)
+docs/privat/

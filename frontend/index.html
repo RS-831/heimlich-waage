@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#eef3f2">
+  <title>heimlich · Waage</title>
+  <script>
+    // Hell/Dunkel vor dem ersten Zeichnen setzen (kein Aufblitzen)
+    (function () {
+      var t = "auto"; try { t = localStorage.getItem("theme") || "auto"; } catch (e) {}
+      if (t === "auto") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="theme-petrol.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="app-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M8 9a5 5 0 0 1 8 0l-3 4"/></svg></span>
+      <div class="brand-text"><span class="brand-sub"><b>heimlich</b> · Waage</span><h1 id="page-title">Übersicht</h1></div>
+    </div>
+    <!-- Navigation: am Desktop oben, auf dem Handy als Leiste unten -->
+    <nav class="tabs" aria-label="Hauptnavigation">
+      <a href="#/" data-nav="dashboard">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-7M22 19H2"/></svg>
+        <span>Übersicht</span></a>
+      <a href="#/eintraege" data-nav="entries">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        <span>Einträge</span></a>
+      <a href="#/einstellungen" data-nav="settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        <span>Einstellungen</span></a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ===================== Übersicht ===================== -->
+    <div data-view="dashboard">
+      <section class="hero" aria-label="Trendgewicht und Eintragen">
+        <div class="hero-top">
+          <span>Trendgewicht</span>
+          <span class="hero-badge" id="hero-badge" hidden></span>
+        </div>
+        <div class="hero-value"><span id="hero-trend">–</span><small>kg</small></div>
+        <div class="hero-sub" id="hero-sub">Trag unten dein erstes Gewicht ein.</div>
+        <form id="entry-form" autocomplete="off" novalidate>
+          <div class="quick">
+            <label class="quick-input"><span class="sr">Gewicht in kg</span>
+              <input id="f-weight" type="text" inputmode="decimal" placeholder="Gewicht eintragen" required>
+              <span aria-hidden="true">kg</span>
+            </label>
+            <button type="submit" class="hi" id="btn-save">Speichern</button>
+          </div>
+          <details class="more">
+            <summary>Datum, Bauchumfang, Notiz</summary>
+            <div class="form-grid">
+              <label>Datum <input id="f-date" type="date" required></label>
+              <label>Bauchumfang (cm) <input id="f-waist" type="text" inputmode="decimal" placeholder="optional"></label>
+              <label class="full">Notiz <input id="f-note" type="text" maxlength="500" placeholder="optional"></label>
+            </div>
+          </details>
+        </form>
+        <div class="msg" id="entry-msg" role="status"></div>
+      </section>
+
+      <section class="card goal" id="goal-card" aria-label="Ziel" hidden></section>
+
+      <section id="tiles" class="tiles" aria-label="Kennzahlen"></section>
+
+      <section class="card" aria-labelledby="h-chart">
+        <div class="toolbar">
+          <h2 id="h-chart" style="margin:0;align-self:center">Verlauf</h2>
+          <div class="seg" id="range" role="group" aria-label="Zeitraum">
+            <button data-days="30">1 M</button><button data-days="91">3 M</button><button data-days="182">6 M</button><button data-days="365">1 J</button><button data-days="0">Alles</button>
+          </div>
+        </div>
+        <div class="chart" id="chart"></div>
+        <div class="legend" id="legend">
+          <span><i class="k-raw"></i>Messwert</span>
+          <span><i class="k-trend"></i>Trend</span>
+          <span id="lg-forecast"><i class="k-forecast"></i>Prognose</span>
+          <span id="lg-goal"><i class="k-goal"></i>Ziel</span>
+        </div>
+        <div class="actions" style="margin-top:10px">
+          <span class="hint" style="margin:0">Trend:</span>
+          <div class="seg" id="method" role="group" aria-label="Trendmethode">
+            <button data-method="ewma" title="Exponentiell geglättet (Hacker's Diet)">Geglättet</button><button data-method="sma7">7-Tage-Ø</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="waist-card" aria-labelledby="h-waist" hidden>
+        <h2 id="h-waist">Bauchumfang <small>cm</small></h2>
+        <div class="chart" id="waist-chart"></div>
+      </section>
+    </div>
+
+    <!-- ===================== Einträge ===================== -->
+    <div data-view="entries" hidden>
+      <section class="card" aria-labelledby="h-list">
+        <h2 id="h-list">Alle Einträge <small id="list-count"></small></h2>
+        <table class="entries">
+          <thead><tr><th>Datum</th><th class="num">Gewicht</th><th class="num" title="Abweichung vom Trend">Δ Trend</th><th class="act"><span class="sr">Aktionen</span></th></tr></thead>
+          <tbody id="list"></tbody>
+        </table>
+        <div class="actions"><button id="btn-more" hidden>Mehr anzeigen</button></div>
+      </section>
+    </div>
+
+    <!-- ===================== Einstellungen (Menü) ===================== -->
+    <div data-view="settings" hidden>
+      <nav class="card menu" aria-label="Einstellungen">
+        <a href="#/einstellungen/ziel">
+          <span><b>Ziel</b><small id="menu-goal">Zielgewicht und Zieldatum</small></span><i aria-hidden="true">›</i></a>
+        <a href="#/einstellungen/profil">
+          <span><b>Profil</b><small id="menu-profile">Name und Größe für den BMI</small></span><i aria-hidden="true">›</i></a>
+        <a href="#/einstellungen/darstellung">
+          <span><b>Darstellung</b><small id="menu-theme">Automatisch</small></span><i aria-hidden="true">›</i></a>
+        <a href="#/einstellungen/daten">
+          <span><b>Daten</b><small>CSV exportieren und importieren</small></span><i aria-hidden="true">›</i></a>
+      </nav>
+    </div>
+
+    <!-- Unterseite: Ziel -->
+    <div data-view="goal" hidden>
+      <a class="back" href="#/einstellungen">‹ Einstellungen</a>
+      <section class="card">
+        <form id="goal-form" class="form-grid" novalidate>
+          <label>Zielgewicht (kg)
+            <input id="g-weight" type="text" inputmode="decimal" placeholder="z. B. 78">
+          </label>
+          <label>Zieldatum
+            <input id="g-date" type="date">
+          </label>
+          <p class="hint full" id="goal-info">Startpunkt ist dein aktuelles Trendgewicht. Das Zieldatum ist optional.</p>
+          <div class="actions full">
+            <button type="submit" class="primary">Ziel speichern</button>
+            <button type="button" class="danger" id="btn-goal-delete" hidden>Ziel entfernen</button>
+          </div>
+        </form>
+        <div class="msg" id="goal-msg" role="status"></div>
+      </section>
+    </div>
+
+    <!-- Unterseite: Profil -->
+    <div data-view="profile" hidden>
+      <a class="back" href="#/einstellungen">‹ Einstellungen</a>
+      <section class="card">
+        <form id="profile-form" class="form-grid" novalidate>
+          <label>Name
+            <input id="p-name" type="text" maxlength="60">
+          </label>
+          <label>Größe (cm)
+            <input id="p-height" type="text" inputmode="decimal" placeholder="für den BMI">
+          </label>
+          <div class="actions full"><button type="submit" class="primary">Profil speichern</button></div>
+        </form>
+        <div class="msg" id="profile-msg" role="status"></div>
+      </section>
+    </div>
+
+    <!-- Unterseite: Darstellung -->
+    <div data-view="appearance" hidden>
+      <a class="back" href="#/einstellungen">‹ Einstellungen</a>
+      <section class="card">
+        <h2>Farbmodus</h2>
+        <div class="seg seg-wide" id="theme-seg" role="group" aria-label="Farbmodus">
+          <button data-theme-choice="auto">Automatisch</button><button data-theme-choice="light">Hell</button><button data-theme-choice="dark">Dunkel</button>
+        </div>
+        <p class="hint">„Automatisch“ folgt der Einstellung deines Geräts. Die Wahl gilt nur für diesen Browser.</p>
+      </section>
+    </div>
+
+    <!-- Unterseite: Daten -->
+    <div data-view="data" hidden>
+      <a class="back" href="#/einstellungen">‹ Einstellungen</a>
+      <section class="card">
+        <h2>Export</h2>
+        <p class="hint" style="margin-top:0">Alle Einträge als CSV-Datei, z. B. als Sicherung oder für Excel.</p>
+        <div class="actions"><a class="button" href="api/export.csv" download>Als CSV exportieren</a></div>
+      </section>
+      <section class="card">
+        <h2>Import</h2>
+        <p class="hint" style="margin-top:0">Spalten <code>date;weight_kg;waist_cm;note</code>. Komma oder Semikolon,
+          Datum als 2026-11-11 oder 11.11.2026, deutsche Spaltennamen (Datum, Gewicht …) gehen auch.</p>
+        <label style="margin-top:10px">CSV-Datei
+          <input id="i-file" type="file" accept=".csv,text/csv,text/plain">
+        </label>
+        <label style="margin-top:8px"><input id="i-overwrite" type="checkbox">Vorhandene Tage überschreiben</label>
+        <div class="actions"><button id="btn-import" class="primary" disabled>Importieren</button></div>
+        <div class="msg" id="import-msg" role="status"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Dialog: Eintrag bearbeiten -->
+  <dialog id="edit-dialog" aria-labelledby="edit-title">
+    <form id="edit-form" class="form-grid" method="dialog" novalidate>
+      <h2 id="edit-title" class="full">Eintrag bearbeiten</h2>
+      <label>Gewicht (kg)
+        <input id="e-weight" class="big" type="text" inputmode="decimal" required>
+      </label>
+      <label>Bauchumfang (cm)
+        <input id="e-waist" type="text" inputmode="decimal" placeholder="optional">
+      </label>
+      <label class="full">Notiz
+        <input id="e-note" type="text" maxlength="500" placeholder="optional">
+      </label>
+      <div class="msg full" id="edit-msg" role="status"></div>
+      <div class="actions full">
+        <button type="submit" class="primary" value="save">Speichern</button>
+        <button type="button" id="edit-cancel">Abbrechen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Dialog: Rückfrage -->
+  <dialog id="confirm-dialog" aria-labelledby="confirm-text">
+    <p id="confirm-text"></p>
+    <div class="actions">
+      <button type="button" class="primary" id="confirm-ok">OK</button>
+      <button type="button" id="confirm-cancel">Abbrechen</button>
+    </div>
+  </dialog>
+
+  <script src="chart.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

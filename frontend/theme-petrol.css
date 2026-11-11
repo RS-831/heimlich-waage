@@ -1,0 +1,22 @@
+/* Tool-Akzent: Petrol mit Orange (heimlich · Waage).
+   Ein weiteres Tool kopiert diese Datei und setzt nur diese Werte neu. */
+:root {
+  --accent: #0e7c7b;       /* Hauptfarbe: Hero-Karte, aktive Navigation, Trendlinie */
+  --accent-ink: #ffffff;   /* Text auf --accent */
+  --tint: #d7ecea;         /* helle Fläche in Akzentfarbe (Symbol-Hintergründe, Badges) */
+  --hi: #e08a1e;           /* Zweitfarbe: Ziel, Fortschritt, Speichern */
+  --hi-ink: #13201f;       /* Text auf --hi */
+  --hi-tint: #fbebd3;
+  --hi-text: #a65e00;      /* Zweitfarbe als Schrift auf hellem Grund */
+  --trend: var(--accent);
+  --goal: var(--hi);
+}
+:root[data-theme="dark"] {
+  --accent: #2bb3ae;
+  --accent-ink: #06201f;
+  --tint: #143a38;
+  --hi: #f0a04b;
+  --hi-ink: #1a1206;
+  --hi-tint: #3a2a14;
+  --hi-text: #f0a04b;
+}
