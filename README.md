@@ -31,22 +31,30 @@ Daten in einer SQLite-Datei, Betrieb per Docker (Laptop oder NAS).
 
 <sub>Screenshots mit Beispieldaten.</sub>
 
-## Starten mit Docker
+## Starten
+
+Voraussetzung: Docker mit Compose-Plugin, dein Benutzer in der Gruppe `docker`.
 
 ```bash
-cp .env.example .env        # einmalig, Werte bei Bedarf anpassen
-docker compose up -d --build
+./waage.sh            # bauen, starten und Adresse anzeigen
 ```
 
-Dann im Browser: http://localhost:8000 – vom Handy im Heimnetz: `http://<IP-des-Laptops>:8000`
-(IP mit `hostname -I` herausfinden).
+Beim ersten Start legt das Skript die `.env` und den Datenordner `~/gewicht-daten` an.
+Danach zeigt es die Adressen für Laptop und Handy (im selben WLAN) an.
 
-Nach Code-Änderungen: `docker compose up -d --build` erneut ausführen.
+| Befehl | Wirkung |
+|---|---|
+| `./waage.sh start` | bauen und starten (Standard) |
+| `./waage.sh stop` | anhalten, Daten bleiben erhalten |
+| `./waage.sh restart` | neu starten |
+| `./waage.sh status` | läuft sie, ist sie erreichbar? |
+| `./waage.sh logs` | Protokoll live ansehen |
+| `./waage.sh update` | neuesten Stand von GitHub holen und neu starten |
+| `./waage.sh backup` | Kopie der Datenbank nach `~/gewicht-daten/backups/` |
 
-Die Datendatei liegt im Ordner `DATA_PATH` (Standard: `~/gewicht-daten`) und wird im Container
-unter `/data` eingebunden. Sie wird **nie** ins Git-Repo eingecheckt.
-
-Stoppen: `docker compose down` · Logs: `docker compose logs -f`
+Die Datenbank liegt im Ordner `DATA_PATH` aus der `.env` und wird im Container unter `/data`
+eingebunden. Sie wird **nie** ins Git-Repo eingecheckt. Ohne Skript geht es auch direkt:
+`docker compose up -d --build` bzw. `docker compose down`.
 
 ## Funktionen (MVP)
 
