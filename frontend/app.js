@@ -257,11 +257,12 @@
   });
 
   // --- Diagramme --------------------------------------------------------------
+  // Zeiträume zählen ab heute rückwärts (nicht ab dem letzten Eintrag)
+  const todayUtc = () => new Date(Date.parse(localToday() + "T00:00:00Z"));
   function rangeFrom() {
     const s = state.summary;
     if (!state.rangeDays || !s || !s.series.length) return null;
-    const last = Date.parse(s.series[s.series.length - 1].date + "T00:00:00Z");
-    return new Date(last - (state.rangeDays - 1) * 86400000);
+    return new Date(todayUtc().getTime() - (state.rangeDays - 1) * 86400000);
   }
   function renderChart() {
     const s = state.summary;
@@ -274,7 +275,7 @@
     $("lg-goal").hidden = goal == null;
     Chart.render($("chart"), {
       points: series.map((p) => ({ date: p.date, value: p.weight, trend: p.trend, src: p })),
-      from: rangeFrom(), forecast, goal, unit: "kg", label: "Gewichtsverlauf mit Trend",
+      from: rangeFrom(), to: todayUtc(), forecast, goal, unit: "kg", label: "Gewichtsverlauf mit Trend",
       tooltip: (p) => `<b>${fmtDate(p.date)}</b>
         <div class="row"><span>Gewicht</span><span>${f1.format(p.value)} kg</span></div>
         <div class="row"><span>Trend</span><span>${f1.format(p.trend)} kg</span></div>
@@ -286,7 +287,7 @@
     if (waist.length >= 2) {
       Chart.render($("waist-chart"), {
         points: waist.map((p) => ({ date: p.date, value: p.waist, trend: null })),
-        from: rangeFrom(), showTrend: false, unit: "cm", height: 180, label: "Bauchumfang",
+        from: rangeFrom(), to: todayUtc(), showTrend: false, unit: "cm", height: 180, label: "Bauchumfang",
         tooltip: (p) => `<b>${fmtDate(p.date)}</b><div class="row"><span>Bauch</span><span>${f1.format(p.value)} cm</span></div>`,
       });
     }

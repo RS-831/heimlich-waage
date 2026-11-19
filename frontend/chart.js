@@ -34,7 +34,7 @@
     const fmtMonY = new Intl.DateTimeFormat("de-DE", { month: "short", year: "2-digit", timeZone: "UTC" });
     const ticks = [];
     if (spanDays <= 70) {
-      const step = [1, 2, 7, 14].find((s) => spanDays / s <= maxTicks) || 14;
+      const step = [1, 2, 3, 7, 14].find((s) => spanDays / s <= maxTicks) || 14;
       let t = t0 - (t0 % DAY);
       if (step === 7 || step === 14) {               // auf Montage ausrichten
         const wd = (new Date(t).getUTCDay() + 6) % 7;
@@ -77,12 +77,13 @@
     const iw = width - m.left - m.right, ih = height - m.top - m.bottom;
 
     // x-Bereich: gewählter Zeitraum, rechts etwas Platz für die Prognose
-    const lastT = toTime(all[all.length - 1].date);
-    let t0 = from != null ? Math.min(from, toTime(pts[0].date)) : toTime(pts[0].date);
-    if (from == null || pts.length === all.length) t0 = Math.max(t0, toTime(pts[0].date) - DAY);
-    const span = Math.max(lastT - t0, 6 * DAY);
-    let t1 = lastT + (opts.forecast ? Math.max(3 * DAY, span * 0.2) : DAY);
+    // Mit Zeitraum: Achse zeigt immer den ganzen Zeitraum (from … heute), auch wenn es erst
+    // wenige Werte gibt. "Alles": vom ersten bis zum letzten Wert, mindestens eine Woche.
+    const lastT = Math.max(toTime(all[all.length - 1].date), opts.to ? opts.to.getTime() : 0);
+    let t0 = from != null ? from : toTime(pts[0].date) - DAY;
     if (lastT - t0 < 6 * DAY) t0 = lastT - 6 * DAY;
+    const span = lastT - t0;
+    const t1 = lastT + (opts.forecast ? Math.max(3 * DAY, span * 0.2) : DAY);
 
     // y-Bereich: sichtbare Werte, Trend, Ziel, sichtbare Prognose
     const ys = [];
