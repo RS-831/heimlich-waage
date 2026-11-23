@@ -132,6 +132,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 }
 .seg button + button { border-left: 1px solid var(--axis); }
 .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.seg button:disabled { opacity: 0.35; cursor: default; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; margin-bottom: 8px; }
 
 /* Diagramm */

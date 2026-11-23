@@ -259,15 +259,40 @@
   // --- Diagramme --------------------------------------------------------------
   // Zeiträume zählen ab heute rückwärts (nicht ab dem letzten Eintrag)
   const todayUtc = () => new Date(Date.parse(localToday() + "T00:00:00Z"));
-  function rangeFrom() {
+  const RANGES = [30, 91, 182, 365];
+  // Wie viele Tage reichen die Daten zurück (inkl. heute)?
+  function dataSpanDays() {
     const s = state.summary;
-    if (!state.rangeDays || !s || !s.series.length) return null;
-    return new Date(todayUtc().getTime() - (state.rangeDays - 1) * 86400000);
+    if (!s || !s.series.length) return 0;
+    return Math.round((todayUtc() - Date.parse(s.series[0].date + "T00:00:00Z")) / 86400000) + 1;
+  }
+  // Zeiträume, die nichts Neues zeigen würden: länger als der kürzeste, der schon alles enthält
+  function rangeAvailable(days) {
+    if (!days) return true;
+    const span = dataSpanDays();
+    const covering = RANGES.find((r) => r >= span);
+    return covering == null || days <= covering;
+  }
+  // Gewählter Zeitraum, notfalls auf den kürzesten passenden zurückgeführt (Wahl bleibt gespeichert)
+  function effectiveRange() {
+    if (rangeAvailable(state.rangeDays)) return state.rangeDays;
+    return RANGES.find((r) => rangeAvailable(r) && r >= dataSpanDays()) || 0;
+  }
+  function rangeFrom() {
+    const s = state.summary, days = effectiveRange();
+    if (!days || !s || !s.series.length) return null;
+    return new Date(todayUtc().getTime() - (days - 1) * 86400000);
   }
   function renderChart() {
     const s = state.summary;
     const series = s ? s.series : [];
-    for (const b of $("range").querySelectorAll("button")) b.setAttribute("aria-pressed", String(Number(b.dataset.days) === state.rangeDays));
+    const eff = effectiveRange();
+    for (const b of $("range").querySelectorAll("button")) {
+      const d = Number(b.dataset.days), ok = rangeAvailable(d);
+      b.disabled = !ok;
+      b.title = ok ? "" : "Deine Einträge reichen noch nicht so weit zurück";
+      b.setAttribute("aria-pressed", String(d === eff));
+    }
     for (const b of $("method").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.method === state.method));
     const forecast = s && s.forecast ? s.forecast.line.map((p) => ({ date: p.date, value: p.weight })) : null;
     const goal = s && s.goal ? s.goal.target_weight_kg : null;

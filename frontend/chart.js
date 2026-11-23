@@ -76,11 +76,11 @@
     const m = { top: 12, right: 12, bottom: 24, left: 40 };
     const iw = width - m.left - m.right, ih = height - m.top - m.bottom;
 
-    // x-Bereich: gewählter Zeitraum, rechts etwas Platz für die Prognose
-    // Mit Zeitraum: Achse zeigt immer den ganzen Zeitraum (from … heute), auch wenn es erst
-    // wenige Werte gibt. "Alles": vom ersten bis zum letzten Wert, mindestens eine Woche.
+    // x-Bereich: gewählter Zeitraum bis heute, aber nie vor dem ersten Messwert überhaupt.
+    // Rechts etwas Platz für die Prognose; mindestens eine Woche breit.
     const lastT = Math.max(toTime(all[all.length - 1].date), opts.to ? opts.to.getTime() : 0);
-    let t0 = from != null ? from : toTime(pts[0].date) - DAY;
+    const firstT = toTime(all[0].date) - DAY;
+    let t0 = from != null ? Math.max(from, firstT) : firstT;
     if (lastT - t0 < 6 * DAY) t0 = lastT - 6 * DAY;
     const span = lastT - t0;
     const t1 = lastT + (opts.forecast ? Math.max(3 * DAY, span * 0.2) : DAY);
@@ -97,7 +97,15 @@
       fc = [[ta, a.value], [tEnd, vEnd]];
       ys.push(vEnd);
     }
-    if (opts.goal != null) ys.push(opts.goal);
+    // Ziel nur in die Skala nehmen, wenn es nah an den Werten liegt – sonst würden die
+    // Messwerte zu einer flachen Linie zusammengedrückt. Weit entfernt: Hinweis am Rand.
+    let goalOff = 0; // -1 = Ziel liegt darunter, +1 = darüber
+    if (opts.goal != null) {
+      const lo = Math.min(...ys), hi = Math.max(...ys);
+      const reach = Math.max(3, (hi - lo) * 1.5);
+      if (opts.goal >= lo - reach && opts.goal <= hi + reach) ys.push(opts.goal);
+      else goalOff = opts.goal < lo ? -1 : 1;
+    }
     let y0 = Math.min(...ys), y1 = Math.max(...ys);
     const pad = Math.max(0.5, (y1 - y0) * 0.08);
     y0 -= pad; y1 += pad;
@@ -130,7 +138,12 @@
     const plot = el("g", { "clip-path": `url(#${clipId})` }, svg);
 
     // Ziel
-    if (opts.goal != null) {
+    if (goalOff) {
+      const below = goalOff < 0;
+      const lbl = el("text", { class: "goal-label", x: m.left + iw - 4, "text-anchor": "end",
+        y: below ? m.top + ih - 6 : m.top + 12 }, svg);
+      lbl.textContent = `Ziel ${nf(1).format(opts.goal)} ${unit} ${below ? "↓" : "↑"}`;
+    } else if (opts.goal != null) {
       el("line", { class: "goal", x1: m.left, x2: m.left + iw, y1: y(opts.goal), y2: y(opts.goal) }, plot);
       const lbl = el("text", { class: "goal-label", x: m.left + 4, y: y(opts.goal) - 5 }, svg);
       lbl.textContent = "Ziel " + nf(1).format(opts.goal) + " " + unit;
