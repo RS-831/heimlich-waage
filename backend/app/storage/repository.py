@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+from datetime import datetime, timezone
 from datetime import date
 from typing import Iterable, Protocol
 
@@ -13,6 +14,10 @@ class Repository(Protocol):
     def get_user(self, user_id: int) -> User | None: ...
     def default_user(self) -> User: ...
     def update_profile(self, user_id: int, *, name: str, height_cm: float | None) -> User: ...
+    def get_user_by_username(self, username: str) -> User | None: ...
+    def create_user(self, username: str, name: str, role: str) -> User: ...
+    def adopt_default_user(self, username: str) -> User | None: ...
+    def touch_user(self, user_id: int, role: str) -> User: ...
 
     def list_entries(self, user_id: int) -> list[Entry]: ...
     def get_entry(self, user_id: int, day: date) -> Entry | None: ...
@@ -39,8 +44,12 @@ def _entry(row: sqlite3.Row) -> Entry:
 def _user(row: sqlite3.Row) -> User:
     return User(
         id=row["id"], name=row["name"], role=row["role"],
-        height_cm=row["height_cm"], unit=row["unit"],
+        height_cm=row["height_cm"], unit=row["unit"], username=row["username"],
     )
+
+
+class NameTakenError(Exception):
+    """Anzeigename ist schon an einen anderen Nutzer vergeben."""
 
 
 class SqliteRepository:
@@ -68,10 +77,61 @@ class SqliteRepository:
         return _user(row)
 
     def update_profile(self, user_id: int, *, name: str, height_cm: float | None) -> User:
+        try:
+            with self._lock:
+                self.conn.execute(
+                    "UPDATE user SET name = ?, height_cm = ? WHERE id = ?",
+                    (name, height_cm, user_id),
+                )
+        except sqlite3.IntegrityError:
+            raise NameTakenError(name) from None
+        return self.get_user(user_id)  # type: ignore[return-value]
+
+    def get_user_by_username(self, username: str) -> User | None:
+        row = self._one("SELECT * FROM user WHERE username = ?", (username,))
+        return _user(row) if row else None
+
+    def create_user(self, username: str, name: str, role: str) -> User:
+        """Legt einen Nutzer an. Ist der Anzeigename vergeben, wird eine Ziffer angehängt.
+        Legt ein paralleler Aufruf denselben Login gleichzeitig an, wird dieser zurückgegeben."""
+        base = (name or username).strip()[:60] or username
+        with self._lock:
+            for n in range(1, 1000):
+                candidate = base if n == 1 else f"{base[:56]} {n}"
+                try:
+                    self.conn.execute(
+                        "INSERT INTO user (name, username, role) VALUES (?, ?, ?)",
+                        (candidate, username, role),
+                    )
+                    break
+                except sqlite3.IntegrityError:
+                    existing = self.get_user_by_username(username)
+                    if existing:  # gleichzeitiger Erst-Login
+                        return existing
+                    # sonst war nur der Anzeigename vergeben → nächste Ziffer
+            else:
+                raise RuntimeError("Kein freier Anzeigename gefunden")
+        return self.get_user_by_username(username)  # type: ignore[return-value]
+
+    def adopt_default_user(self, username: str) -> User | None:
+        """Ordnet den ersten Nutzer (Standardnutzer aus dem lokalen Betrieb) samt Daten diesem
+        Login zu – nur, solange er noch keinem Login gehört. Sonst None."""
+        try:
+            with self._lock:
+                cur = self.conn.execute(
+                    "UPDATE user SET username = ? WHERE username IS NULL "
+                    "AND id = (SELECT MIN(id) FROM user)",
+                    (username,),
+                )
+        except sqlite3.IntegrityError:  # Login existiert inzwischen schon
+            return self.get_user_by_username(username)
+        return self.get_user_by_username(username) if cur.rowcount else None
+
+    def touch_user(self, user_id: int, role: str) -> User:
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         with self._lock:
             self.conn.execute(
-                "UPDATE user SET name = ?, height_cm = ? WHERE id = ?",
-                (name, height_cm, user_id),
+                "UPDATE user SET role = ?, last_seen_at = ? WHERE id = ?", (role, now, user_id)
             )
         return self.get_user(user_id)  # type: ignore[return-value]
 

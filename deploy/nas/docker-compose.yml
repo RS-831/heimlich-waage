@@ -1,0 +1,30 @@
+# Vorlage: heimlich · Waage auf einem NAS hinter Traefik + Authelia (AUTH_MODE=proxy).
+# Alle eigenen Werte stehen in einer .env neben dieser Datei (Vorlage: .env.example).
+#
+# WICHTIG: Der Port wird nur auf 127.0.0.1 veröffentlicht. Im Proxy-Modus vertraut die App den
+# Remote-*-Headern. Wäre der Port im Netz erreichbar, könnte jeder sich als beliebiger Nutzer
+# ausgeben. Diese Vorlage geht von Traefik im Host-Netzwerk aus; bei Traefik in einem
+# Docker-Netzwerk stattdessen ein gemeinsames Netzwerk nutzen und "ports" ganz weglassen.
+services:
+  waage:
+    image: ${WAAGE_IMAGE:-ghcr.io/rs-831/heimlich-waage:latest}
+    container_name: heimlich-waage
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WAAGE_PORT:-8000}:8000"
+    environment:
+      AUTH_MODE: proxy
+      AUTH_ADMIN_GROUP: ${AUTH_ADMIN_GROUP:-admins}
+      AUTH_REQUIRED_GROUP: ${AUTH_REQUIRED_GROUP:-}
+      AUTH_ADOPT_DEFAULT_USER: ${AUTH_ADOPT_DEFAULT_USER:-}
+      AUTH_LOGOUT_URL: ${AUTH_LOGOUT_URL:-}
+      AUTH_TRUSTED_PROXIES: ${AUTH_TRUSTED_PROXIES:-}
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - ./data:/data
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.waage.rule=Host(`${WAAGE_HOST:?WAAGE_HOST fehlt in .env}`)
+      - traefik.http.routers.waage.service=waage
+      - traefik.http.routers.waage.middlewares=${TRAEFIK_AUTH_MIDDLEWARE:-authelia@docker}
+      - traefik.http.services.waage.loadbalancer.server.url=http://127.0.0.1:${WAAGE_PORT:-8000}

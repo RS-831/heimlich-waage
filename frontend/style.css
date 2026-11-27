@@ -324,3 +324,20 @@ button.hi { background: var(--hi); border-color: var(--hi); color: var(--hi-ink)
 .seg button + button { border-left: 0; }
 .seg-wide { display: flex; }
 .seg-wide button { flex: 1; min-height: 40px; }
+
+/* Angemeldeter Nutzer (Proxy-Modus) */
+.user-box { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: var(--ink-2); white-space: nowrap; }
+.user-box #user-name { font-weight: 600; color: var(--ink); max-width: 30vw; overflow: hidden; text-overflow: ellipsis; }
+.user-box a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.user-box a:hover { text-decoration: underline; }
+.banner {
+  position: sticky; top: 0; z-index: 30; padding: 10px 14px; text-align: center; font-weight: 600;
+  background: var(--hi); color: var(--hi-ink);
+}
+header.top { flex-wrap: wrap; row-gap: 8px; }
+.brand { flex: none; }
+.brand-sub { white-space: nowrap; }
+@media (min-width: 700px) {
+  .tabs { margin-left: auto; }
+  .user-box { flex-basis: 100%; justify-content: flex-end; margin-top: -4px; }
+}

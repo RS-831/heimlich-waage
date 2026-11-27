@@ -8,9 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
 from app.analytics.summary import TREND_METHODS, summarize
+from app.core.auth import AuthError, resolve_user
+from app.core.config import Settings
 from app.core.models import Entry, Goal, User
 from app.importers.csv_format import parse_csv, to_csv, validate_waist, validate_weight
-from app.storage.repository import Repository
+from app.storage.repository import NameTakenError, Repository
 
 router = APIRouter(prefix="/api")
 
@@ -22,12 +24,22 @@ def get_repo(request: Request) -> Repository:
     return request.app.state.repo
 
 
-def current_user(repo: Annotated[Repository, Depends(get_repo)]) -> User:
-    """Phase 1 (AUTH_MODE=none): immer der Standardnutzer. Später: Nutzer aus der Session."""
-    return repo.default_user()
+def get_settings(request: Request) -> Settings:
+    return request.app.state.settings
+
+
+def current_user(request: Request, repo: Annotated[Repository, Depends(get_repo)],
+                 s: Annotated[Settings, Depends(get_settings)]) -> User:
+    """AUTH_MODE=none: Standardnutzer. AUTH_MODE=proxy: Nutzer aus den Headern des Proxys."""
+    try:
+        return resolve_user(repo, s, request.headers,
+                            request.client.host if request.client else None)
+    except AuthError as exc:
+        raise HTTPException(exc.status, exc.message) from None
 
 
 Repo = Annotated[Repository, Depends(get_repo)]
+Conf = Annotated[Settings, Depends(get_settings)]
 CurrentUser = Annotated[User, Depends(current_user)]
 
 
@@ -129,6 +141,13 @@ def get_summary(repo: Repo, user: CurrentUser,
                      goal=repo.get_goal(user.id), method=method, today=today)
 
 
+# --- Angemeldeter Nutzer -------------------------------------------------------
+@router.get("/me")
+def me(user: CurrentUser, s: Conf):
+    return {"username": user.username, "name": user.name, "role": user.role,
+            "auth_mode": s.auth_mode, "logout_url": s.auth_logout_url or None}
+
+
 # --- Profil -------------------------------------------------------------------
 @router.get("/profile", response_model=ProfileOut)
 def get_profile(user: CurrentUser):
@@ -137,7 +156,10 @@ def get_profile(user: CurrentUser):
 
 @router.put("/profile", response_model=ProfileOut)
 def put_profile(data: ProfileIn, repo: Repo, user: CurrentUser):
-    updated = repo.update_profile(user.id, name=data.name.strip(), height_cm=data.height_cm)
+    try:
+        updated = repo.update_profile(user.id, name=data.name.strip(), height_cm=data.height_cm)
+    except NameTakenError:
+        raise HTTPException(409, "Dieser Name ist schon vergeben") from None
     return ProfileOut(name=updated.name, height_cm=updated.height_cm, role=updated.role)
 
 

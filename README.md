@@ -8,11 +8,13 @@ bedienen. Web-App mit FastAPI und schlankem Browser-Frontend ohne externe Abhän
 Daten in einer SQLite-Datei, Betrieb per Docker (Laptop oder NAS).
 
 > [!WARNING]
-> **Nur für den lokalen Betrieb im eigenen Netz gedacht.** Die App hat derzeit keine Anmeldung,
+> **Im Standardmodus (`AUTH_MODE=none`) nur für den lokalen Betrieb im eigenen Netz gedacht.**
+> In diesem Modus hat die App keine Anmeldung,
 > kein HTTPS und keinen Schutz gegen Missbrauch (z. B. Rate-Limits). Jeder, der den Port erreicht,
 > kann alle Daten lesen, ändern und löschen. Die App daher **nicht** per Portfreigabe, Reverse
 > Proxy oder Tunnel ins Internet stellen. Für Zugriff von unterwegs besser ein VPN ins Heimnetz
-> nutzen (z. B. WireGuard oder Tailscale).
+> nutzen (z. B. WireGuard oder Tailscale). Mit Anmeldung und getrennten Daten pro Person:
+> siehe [Betrieb hinter Authelia](#betrieb-hinter-authelia-auth_modeproxy).
 
 ## So sieht es aus
 
@@ -90,20 +92,57 @@ cd backend && DATA_DIR=~/gewicht-daten uvicorn app.main:app --reload
 backend/app/
   analytics/   Trend, Prognose, Kennzahlen (reines Python)
   api/         REST-Endpunkte (/api/...)
-  core/        Konfiguration, Datentypen
+  core/        Konfiguration, Datentypen, Nutzer-Ermittlung (auth.py)
   importers/   CSV (später Waagen-Importe)
   storage/     SQLite, Migrationen, Repository
 frontend/      index.html, app.js, chart.js, style.css – ohne Build-Schritt
+deploy/nas/    Vorlage für den Betrieb hinter Traefik + Authelia
+docker/        Entrypoint des Containers
 tests/
 ```
 
-## Umzug auf das NAS
+## Betrieb hinter Authelia (`AUTH_MODE=proxy`)
 
-1. Repo auf das NAS klonen (oder Image bauen und übertragen).
-2. `.env` anlegen, `DATA_PATH` auf einen lokalen Ordner des NAS setzen
-   (kein SMB/NFS-Mount – SQLite-Locking ist dort unzuverlässig), `UID`/`GID` an den NAS-Nutzer anpassen.
-3. Bestehende `gewicht.db` in diesen Ordner kopieren.
-4. `docker compose up -d --build`, später `AUTH_MODE=local` für Login.
+Für den Betrieb auf einem Server hinter einem Anmelde-Proxy wie **Traefik + Authelia**. Die App
+verwaltet dann keine Passwörter selbst. Sie liest den angemeldeten Nutzer aus den Headern, die der
+Proxy nach erfolgreicher Anmeldung setzt. Jede Person hat ihre eigenen, getrennten Daten.
+
+> [!CAUTION]
+> Im Proxy-Modus vertraut die App den Headern `Remote-User`, `Remote-Name` und `Remote-Groups`.
+> Das ist nur sicher, wenn **ausschließlich der Proxy** die App erreicht. **Den Port nie im Netzwerk
+> freigeben** (nur `127.0.0.1` oder ein internes Docker-Netzwerk). Der Proxy muss vom Client
+> mitgeschickte gleichnamige Header überschreiben (Traefik mit Authelia-Forward-Auth tut das).
+
+**Ablauf**
+
+1. Das Image baut GitHub Actions bei jedem Push auf `main` und legt es unter
+   `ghcr.io/<owner>/heimlich-waage` ab (Tags `latest`, Kurz-SHA, Versions-Tags `v*`).
+   Damit ein Server ohne Anmeldung ziehen kann, das Paket einmalig öffentlich stellen:
+   GitHub → Profil → *Packages* → `heimlich-waage` → *Package settings* → *Change visibility*.
+2. Auf dem Server [`deploy/nas/docker-compose.yml`](deploy/nas/docker-compose.yml) und
+   [`deploy/nas/.env.example`](deploy/nas/.env.example) in einen Ordner kopieren,
+   `.env.example` in `.env` umbenennen und anpassen (Domain, Abmelde-Adresse, Gruppen).
+3. Bestehende Daten übernehmen (optional): die `gewicht.db` aus dem lokalen Betrieb vor dem
+   ersten Start nach `data/` kopieren und `AUTH_ADOPT_DEFAULT_USER` auf den eigenen Login-Namen
+   setzen. Beim ersten Anmelden gehören die bisherigen Einträge dann diesem Login.
+4. `docker compose up -d`
+
+Den Datenordner als lokalen Ordner anlegen, nicht über SMB/NFS: SQLite-Sperren sind dort
+unzuverlässig.
+
+**Einstellungen**
+
+| Variable | Standard | Bedeutung |
+|---|---|---|
+| `AUTH_MODE` | `none` | `none` = ohne Anmeldung, `proxy` = Nutzer aus Headern |
+| `AUTH_USER_HEADER` | `Remote-User` | Header mit dem Login-Namen |
+| `AUTH_NAME_HEADER` | `Remote-Name` | Header mit dem Anzeigenamen (nur beim ersten Login übernommen) |
+| `AUTH_GROUPS_HEADER` | `Remote-Groups` | Header mit den Gruppen, kommagetrennt |
+| `AUTH_ADMIN_GROUP` | `admins` | Mitglieder bekommen die Rolle `admin` |
+| `AUTH_REQUIRED_GROUP` | *(leer)* | wenn gesetzt: ohne diese Gruppe kein Zugriff (403) |
+| `AUTH_ADOPT_DEFAULT_USER` | *(leer)* | Login, der beim ersten Anmelden die Daten aus dem lokalen Betrieb übernimmt |
+| `AUTH_LOGOUT_URL` | *(leer)* | Ziel des Links „Abmelden“; leer = kein Link |
+| `AUTH_TRUSTED_PROXIES` | *(leer)* | optional: nur Anfragen von diesen IPs/Netzen annehmen |
 
 ## Lizenz
 

@@ -12,6 +12,7 @@ class User:
     role: str
     height_cm: float | None
     unit: str = "kg"
+    username: str | None = None  # Login-Name aus dem Proxy; None = noch keinem Login zugeordnet
 
 
 @dataclass(frozen=True)

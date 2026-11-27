@@ -50,8 +50,43 @@
     node.className = "msg" + (kind ? " " + kind : "");
   }
 
+  // Läuft die Anmeldung am Proxy (z. B. Authelia) ab, leitet er API-Aufrufe zur Login-Seite um.
+  // Der Umleitung nicht folgen (gäbe einen CORS-Fehler), sondern die Seite neu laden:
+  // Der Browser landet dann bei der Anmeldung und danach wieder hier.
+  let reloading = false;
+  function sessionExpired() {
+    if (reloading) return;
+    let last = 0;
+    try { last = Number(sessionStorage.getItem("auth-reload") || 0); } catch { /* egal */ }
+    if (Date.now() - last < 30000) {  // gerade erst neu geladen: keine Endlosschleife
+      showBanner("Nicht angemeldet. Bitte die Seite neu laden oder neu anmelden.");
+      return;
+    }
+    reloading = true;
+    try { sessionStorage.setItem("auth-reload", String(Date.now())); } catch { /* egal */ }
+    showBanner("Anmeldung abgelaufen, wird neu geladen …");
+    setTimeout(() => location.reload(), 800);
+  }
+  function showBanner(text) {
+    let b = document.getElementById("banner");
+    if (!b) {
+      b = document.createElement("div");
+      b.id = "banner"; b.className = "banner"; b.setAttribute("role", "alert");
+      document.body.prepend(b);
+    }
+    b.textContent = text;
+  }
+
   async function api(path, options = {}) {
-    const res = await fetch("api/" + path, options);
+    const res = await fetch("api/" + path, { redirect: "manual", ...options });
+    if (res.type === "opaqueredirect" || res.status === 401) {
+      sessionExpired();
+      throw new Error("Anmeldung abgelaufen");
+    }
+    if (res.status === 403) {
+      showBanner("Kein Zugriff auf die Waage.");
+      throw new Error("Kein Zugriff");
+    }
     if (res.status === 204) return null;
     const body = await res.json().catch(() => null);
     if (!res.ok) {
@@ -448,11 +483,27 @@
     } catch (e) { msg("import-msg", e.message, "error"); }
   });
 
+  // --- Angemeldeter Nutzer (nur im Proxy-Modus sichtbar) ---------------------------
+  async function loadMe() {
+    try {
+      const me = await api("me");
+      try { sessionStorage.removeItem("auth-reload"); } catch { /* egal */ }
+      if (me.auth_mode !== "proxy") return;
+      $("user-name").textContent = me.name;  // textContent: Header-Werte nie als HTML
+      $("user-box").hidden = false;
+      if (me.logout_url) {
+        $("logout-link").href = me.logout_url;
+        $("logout-link").hidden = false;
+      }
+    } catch { /* Meldung kommt aus api() */ }
+  }
+
   // --- Start ------------------------------------------------------------------
   $("f-date").value = localToday();
   $("f-date").max = localToday();
   applyTheme();
   route();
+  loadMe();
   refresh().then(() => {
     if (!state.entries.has(localToday()) && !location.hash.replace(/^#\/?/, "")) $("f-weight").focus();
   });

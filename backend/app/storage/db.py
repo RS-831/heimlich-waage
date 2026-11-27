@@ -46,6 +46,12 @@ MIGRATIONS: list[str] = [
     );
     CREATE INDEX idx_goal_user_active ON goal(user_id, active);
     """,
+    # 2: Anmeldung über einen vorgeschalteten Proxy (AUTH_MODE=proxy)
+    """
+    ALTER TABLE user ADD COLUMN username TEXT;
+    CREATE UNIQUE INDEX idx_user_username ON user(username);
+    ALTER TABLE user ADD COLUMN last_seen_at TEXT;
+    """,
 ]
 
 DEFAULT_USER = "standard"

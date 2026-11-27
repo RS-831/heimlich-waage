@@ -16,6 +16,7 @@ FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     conn = connect(settings.db_path)
+    app.state.settings = settings
     app.state.repo = SqliteRepository(conn)
     try:
         yield
@@ -29,13 +30,15 @@ app.include_router(router)
 
 @app.get("/api/health")
 def health() -> dict:
-    return {
+    s = app.state.settings
+    info = {
         "status": "ok",
-        "data_dir": str(settings.data_dir),
-        "db_file": settings.db_file,
         "schema_version": schema_version(app.state.repo.conn),
-        "auth_mode": settings.auth_mode,
+        "auth_mode": s.auth_mode,
     }
+    if s.auth_mode == "none":  # Pfade nur im lokalen Betrieb zeigen
+        info.update(data_dir=str(s.data_dir), db_file=s.db_file)
+    return info
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

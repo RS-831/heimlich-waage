@@ -124,7 +124,7 @@ cmd_backup() {
   if command -v sqlite3 >/dev/null; then
     sqlite3 "$data/$db" ".backup '$data/backups/${db%.db}-$stamp.db'"
   else
-    docker compose exec -T heimlich-waage python -c \
+    docker compose exec -T -u app heimlich-waage python -c \
       "import sqlite3;s=sqlite3.connect('/data/$db');d=sqlite3.connect('/data/backups/${db%.db}-$stamp.db');s.backup(d)" \
       || die "Für ein Backup braucht es 'sqlite3' (sudo apt install sqlite3) oder eine laufende App (./waage.sh start)."
   fi
